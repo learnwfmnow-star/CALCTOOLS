@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word ↔ PDF Converter</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f8f7ff;
+    --surface: #ffffff;
+    --dark: #1a1033;
+    --gray: #6b6b8a;
+    --border: #e4e2f0;
+    --purple: #6d28d9;
+    --purple-light: #ede9fe;
+    --blue: #2563eb;
+    --blue-light: #dbeafe;
+    --green: #059669;
+    --red: #dc2626;
+  }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; padding: 28px 16px; }
+  .wrapper { max-width: 760px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 32px; }
+  .header h1 { font-family: 'Outfit', sans-serif; font-size: clamp(1.8rem,5vw,2.6rem); font-weight: 800; color: var(--dark); margin-bottom: 8px; letter-spacing: -0.02em; }
+  .header p { color: var(--gray); font-size: 0.9rem; }
+
+  /* Mode selector */
+  .mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .mode-tab { border: 2.5px solid var(--border); border-radius: 16px; padding: 18px; cursor: pointer; background: var(--surface); transition: all 0.2s; text-align: center; }
+  .mode-tab:hover { border-color: var(--purple); }
+  .mode-tab.active { border-color: var(--purple); background: var(--purple-light); }
+  .mode-tab .mt-icon { font-size: 2rem; margin-bottom: 8px; }
+  .mode-tab .mt-title { font-weight: 700; font-size: 0.95rem; color: var(--dark); margin-bottom: 2px; }
+  .mode-tab .mt-sub { font-size: 0.75rem; color: var(--gray); }
+  .mode-tab.active .mt-title { color: var(--purple); }
+
+  /* Drop zone */
+  .dropzone {
+    border: 2.5px dashed var(--border);
+    border-radius: 20px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    background: var(--surface);
+    transition: all 0.2s;
+    margin-bottom: 18px;
+    position: relative;
+  }
+  .dropzone:hover, .dropzone.drag-over { border-color: var(--purple); background: var(--purple-light); }
+  .dropzone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .dz-icon { font-size: 3rem; margin-bottom: 14px; }
+  .dz-title { font-weight: 700; font-size: 1rem; color: var(--dark); margin-bottom: 6px; }
+  .dz-sub { font-size: 0.82rem; color: var(--gray); }
+  .dz-accept { font-size: 0.75rem; color: var(--purple); font-weight: 600; margin-top: 8px; background: var(--purple-light); display: inline-block; padding: 3px 12px; border-radius: 20px; }
+
+  /* File info */
+  .file-info { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px 20px; display: none; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .file-info.show { display: flex; }
+  .fi-icon { font-size: 2rem; flex-shrink: 0; }
+  .fi-name { font-weight: 700; font-size: 0.9rem; color: var(--dark); word-break: break-all; }
+  .fi-size { font-size: 0.75rem; color: var(--gray); margin-top: 2px; }
+  .fi-remove { margin-left: auto; background: none; border: none; color: var(--red); cursor: pointer; font-size: 1.2rem; padding: 4px; flex-shrink: 0; }
+
+  /* Options */
+  .options-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 18px; }
+  .opt-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--gray); margin-bottom: 14px; }
+  .opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .opt-grid { grid-template-columns: 1fr; } }
+  .opt-field label { font-size: 0.78rem; font-weight: 600; color: var(--gray); display: block; margin-bottom: 6px; }
+  .opt-select, .opt-input {
+    width: 100%; border: 2px solid var(--border); border-radius: 10px;
+    padding: 9px 12px; font-size: 0.9rem; font-family: 'Inter', sans-serif;
+    color: var(--dark); background: var(--bg); outline: none;
+  }
+  .opt-select:focus, .opt-input:focus { border-color: var(--purple); }
+
+  /* Convert button */
+  .convert-btn {
+    width: 100%; padding: 16px; background: var(--purple); color: white;
+    font-weight: 800; font-size: 1rem; font-family: 'Outfit', sans-serif;
+    border: none; border-radius: 14px; cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 18px;
+  }
+  .convert-btn:hover { background: #5b21b6; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(109,40,217,0.3); }
+  .convert-btn:disabled { background: var(--gray); transform: none; box-shadow: none; cursor: not-allowed; }
+
+  /* Progress */
+  .progress-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; display: none; margin-bottom: 18px; }
+  .progress-card.show { display: block; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600; color: var(--gray); margin-bottom: 10px; }
+  .progress-track { background: var(--border); border-radius: 6px; height: 10px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--purple), var(--blue)); border-radius: 6px; transition: width 0.3s; }
+  .progress-step { font-size: 0.8rem; color: var(--gray); margin-top: 8px; }
+
+  /* Result */
+  .result-card { background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 2px solid #6ee7b7; border-radius: 20px; padding: 24px; display: none; margin-bottom: 18px; }
+  .result-card.show { display: block; }
+  .rc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .rc-check { font-size: 2rem; }
+  .rc-title { font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: #065f46; }
+  .rc-sub { font-size: 0.8rem; color: #047857; }
+  .download-btn {
+    background: var(--green); color: white; font-weight: 700; font-size: 0.95rem;
+    border: none; border-radius: 12px; padding: 14px 24px; cursor: pointer;
+    transition: opacity 0.2s; display: flex; align-items: center; gap: 8px; width: 100%;
+    justify-content: center; font-family: 'Inter', sans-serif;
+  }
+  .download-btn:hover { opacity: 0.88; }
+
+  /* Preview */
+  .preview-section { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; overflow: hidden; display: none; margin-bottom: 18px; }
+  .preview-section.show { display: block; }
+  .preview-header { padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--gray); display: flex; justify-content: space-between; align-items: center; }
+  .preview-body { padding: 20px; max-height: 360px; overflow-y: auto; font-size: 0.88rem; line-height: 1.7; color: var(--dark); }
+  .preview-body h1, .preview-body h2, .preview-body h3 { font-family: 'Outfit', sans-serif; margin: 12px 0 6px; }
+  .preview-body p { margin-bottom: 8px; }
+  .preview-body table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+  .preview-body td, .preview-body th { border: 1px solid var(--border); padding: 6px 10px; }
+
+  /* Error */
+  .error-card { background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 14px; padding: 16px 18px; display: none; font-size: 0.85rem; color: var(--red); margin-bottom: 18px; }
+  .error-card.show { display: block; }
+
+  /* Hidden PDF content */
+  #pdf-render { position: absolute; left: -9999px; top: 0; width: 794px; padding: 60px; background: white; font-family: 'Inter', sans-serif; font-size: 12px; line-height: 1.7; color: #111; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="header">
+    <h1>Word ↔ PDF Converter</h1>
+    <p>Convert .docx to PDF or extract PDF content — all in your browser, no upload needed</p>
+  </div>
+
+  <div class="mode-tabs">
+    <div class="mode-tab active" id="tab-word2pdf" onclick="setMode('word2pdf')">
+      <div class="mt-icon">📝 → 📄</div>
+      <div class="mt-title">Word → PDF</div>
+      <div class="mt-sub">Convert .docx to downloadable PDF</div>
+    </div>
+    <div class="mode-tab" id="tab-pdf2word" onclick="setMode('pdf2word')">
+      <div class="mt-icon">📄 → 📝</div>
+      <div class="mt-title">PDF → Text (.txt)</div>
+      <div class="mt-sub">Extract text from PDF & download</div>
+    </div>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="file-input" accept=".docx" onchange="handleFile(this.files[0])">
+    <div class="dz-icon" id="dz-icon">📝</div>
+    <div class="dz-title" id="dz-title">Drop your Word file here</div>
+    <div class="dz-sub">or click to browse</div>
+    <div class="dz-accept" id="dz-accept">Accepts .docx files</div>
+  </div>
+
+  <div class="file-info" id="file-info">
+    <div class="fi-icon" id="fi-icon">📝</div>
+    <div>
+      <div class="fi-name" id="fi-name">document.docx</div>
+      <div class="fi-size" id="fi-size">0 KB</div>
+    </div>
+    <button class="fi-remove" onclick="clearFile()">✕</button>
+  </div>
+
+  <div class="options-card" id="options-card">
+    <div class="opt-title">⚙️ PDF Options</div>
+    <div class="opt-grid">
+      <div class="opt-field">
+        <label>Page Size</label>
+        <select class="opt-select" id="opt-size">
+          <option value="a4">A4 (210 × 297 mm)</option>
+          <option value="letter">Letter (8.5 × 11 in)</option>
+          <option value="a3">A3 (297 × 420 mm)</option>
+        </select>
+      </div>
+      <div class="opt-field">
+        <label>Orientation</label>
+        <select class="opt-select" id="opt-orient">
+          <option value="p">Portrait</option>
+          <option value="l">Landscape</option>
+        </select>
+      </div>
+      <div class="opt-field">
+        <label>Font Size (pt)</label>
+        <input type="number" class="opt-input" id="opt-fontsize" value="12" min="8" max="24">
+      </div>
+      <div class="opt-field">
+        <label>Margins (mm)</label>
+        <input type="number" class="opt-input" id="opt-margin" value="20" min="5" max="50">
+      </div>
+    </div>
+  </div>
+
+  <div class="options-card" id="options-pdf" style="display:none">
+    <div class="opt-title">⚙️ Extract Options</div>
+    <div class="opt-grid">
+      <div class="opt-field">
+        <label>Output Format</label>
+        <select class="opt-select" id="opt-pdf-format">
+          <option value="txt" selected>Download as .txt file</option>
+          <option value="copy">Copy to Clipboard</option>
+        </select>
+      </div>
+      <div class="opt-field">
+        <label>Pages to Extract</label>
+        <input type="text" class="opt-input" id="opt-pdf-pages" placeholder="All pages" value="">
+      </div>
+    </div>
+  </div>
+
+  <button class="convert-btn" id="convert-btn" onclick="convert()" disabled>
+    <span id="btn-icon">🔄</span>
+    <span id="btn-text">Select a file first</span>
+  </button>
+
+  <div class="error-card" id="error-card"></div>
+
+  <div class="progress-card" id="progress-card">
+    <div class="progress-label">
+      <span id="progress-label">Processing...</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+    <div class="progress-step" id="progress-step">Reading file...</div>
+  </div>
+
+  <div class="preview-section" id="preview-section">
+    <div class="preview-header">
+      <span>📄 Document Preview</span>
+      <span id="preview-count"></span>
+    </div>
+    <div class="preview-body" id="preview-body"></div>
+  </div>
+
+  <div class="result-card" id="result-card">
+    <div class="rc-header">
+      <div class="rc-check">✅</div>
+      <div>
+        <div class="rc-title" id="rc-title">Conversion Complete!</div>
+        <div class="rc-sub" id="rc-sub">Your file is ready to download</div>
+      </div>
+    </div>
+    <button class="download-btn" id="download-btn" onclick="downloadResult()">
+      ⬇️ <span id="download-label">Download PDF</span>
+    </button>
+  </div>
+</div>
+
+<div id="pdf-render"></div>
+
+<script>
+  let currentMode = 'word2pdf';
+  let currentFile = null;
+  let convertedBlob = null;
+  let convertedText = null;
+
+  function setMode(mode) {
+    currentMode = mode;
+    clearFile();
+    hideResults();
+    document.getElementById('tab-word2pdf').classList.toggle('active', mode === 'word2pdf');
+    document.getElementById('tab-pdf2word').classList.toggle('active', mode === 'pdf2word');
+
+    if (mode === 'word2pdf') {
+      document.getElementById('file-input').accept = '.docx';
+      document.getElementById('dz-icon').textContent = '📝';
+      document.getElementById('dz-title').textContent = 'Drop your Word file here';
+      document.getElementById('dz-accept').textContent = 'Accepts .docx files';
+      document.getElementById('options-card').style.display = 'block';
+      document.getElementById('options-pdf').style.display = 'none';
+      document.getElementById('btn-icon').textContent = '📄';
+    } else {
+      document.getElementById('file-input').accept = '.pdf';
+      document.getElementById('dz-icon').textContent = '📄';
+      document.getElementById('dz-title').textContent = 'Drop your PDF file here';
+      document.getElementById('dz-accept').textContent = 'Accepts .pdf files';
+      document.getElementById('options-card').style.display = 'none';
+      document.getElementById('options-pdf').style.display = 'block';
+      document.getElementById('btn-icon').textContent = '📝';
+    }
+  }
+
+  function handleFile(file) {
+    if (!file) return;
+    currentFile = file;
+    hideResults();
+    showError('');
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    const validExt = currentMode === 'word2pdf' ? ['docx'] : ['pdf'];
+    if (!validExt.includes(ext)) {
+      showError(`❌ Invalid file type. Please upload a .${validExt.join('/')} file.`);
+      currentFile = null;
+      return;
+    }
+
+    const fi = document.getElementById('file-info');
+    fi.classList.add('show');
+    document.getElementById('fi-icon').textContent = ext === 'pdf' ? '📄' : '📝';
+    document.getElementById('fi-name').textContent = file.name;
+    document.getElementById('fi-size').textContent = formatSize(file.size);
+
+    document.getElementById('convert-btn').disabled = false;
+    document.getElementById('btn-text').textContent = currentMode === 'word2pdf' ? 'Convert to PDF' : 'Extract Text from PDF';
+
+    // Preview for docx
+    if (currentMode === 'word2pdf') previewDocx(file);
+  }
+
+  function previewDocx(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      mammoth.convertToHtml({ arrayBuffer: e.target.result })
+        .then(result => {
+          const sec = document.getElementById('preview-section');
+          sec.classList.add('show');
+          document.getElementById('preview-body').innerHTML = result.value || '<em>No content found</em>';
+          const words = result.value.replace(/<[^>]+>/g, '').trim().split(/\s+/).filter(Boolean).length;
+          document.getElementById('preview-count').textContent = words + ' words';
+        });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function clearFile() {
+    currentFile = null;
+    document.getElementById('file-info').classList.remove('show');
+    document.getElementById('file-input').value = '';
+    document.getElementById('convert-btn').disabled = true;
+    document.getElementById('btn-text').textContent = 'Select a file first';
+    hideResults();
+    document.getElementById('preview-section').classList.remove('show');
+  }
+
+  function hideResults() {
+    document.getElementById('result-card').classList.remove('show');
+    document.getElementById('progress-card').classList.remove('show');
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-card');
+    el.textContent = msg;
+    el.classList.toggle('show', !!msg);
+  }
+
+  function setProgress(pct, label, step) {
+    document.getElementById('progress-card').classList.add('show');
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-pct').textContent = pct + '%';
+    if (label) document.getElementById('progress-label').textContent = label;
+    if (step) document.getElementById('progress-step').textContent = step;
+  }
+
+  async function convert() {
+    if (!currentFile) return;
+    showError('');
+    hideResults();
+    document.getElementById('convert-btn').disabled = true;
+
+    if (currentMode === 'word2pdf') {
+      await convertWordToPdf();
+    } else {
+      await extractPdfText();
+    }
+
+    document.getElementById('convert-btn').disabled = false;
+  }
+
+  async function convertWordToPdf() {
+    try {
+      setProgress(10, 'Reading Word file...', 'Parsing .docx structure');
+      const arrayBuffer = await currentFile.arrayBuffer();
+
+      setProgress(35, 'Extracting text...', 'Reading document content');
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      const rawText = result.value || '';
+
+      // Also get HTML version for preview
+      const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
+      document.getElementById('preview-section').classList.add('show');
+      document.getElementById('preview-body').innerHTML = htmlResult.value || '<em>No content</em>';
+      const wordCount = rawText.trim().split(/\s+/).filter(Boolean).length;
+      document.getElementById('preview-count').textContent = wordCount + ' words';
+
+      setProgress(60, 'Building PDF...', 'Writing pages');
+
+      const fontSize = parseInt(document.getElementById('opt-fontsize').value) || 12;
+      const margin = parseInt(document.getElementById('opt-margin').value) || 20;
+      const pageSize = document.getElementById('opt-size').value;
+      const orient = document.getElementById('opt-orient').value;
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: orient, unit: 'mm', format: pageSize });
+
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const contentW = pageW - margin * 2;
+      const contentH = pageH - margin * 2;
+
+      // Set font
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(fontSize);
+
+      const lineHeight = fontSize * 0.4; // mm per line
+      let cursorY = margin;
+      let pageNum = 1;
+
+      // Parse HTML to get structured text with basic heading detection
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlResult.value;
+
+      function addNewPage() {
+        doc.addPage();
+        cursorY = margin;
+        pageNum++;
+      }
+
+      function writeLine(text, isBold, isHeading, headingLevel) {
+        const fs = isHeading
+          ? (headingLevel === 1 ? fontSize + 6 : headingLevel === 2 ? fontSize + 3 : fontSize + 1)
+          : fontSize;
+        doc.setFontSize(fs);
+        doc.setFont('helvetica', (isBold || isHeading) ? 'bold' : 'normal');
+
+        const lh = fs * 0.45;
+
+        if (!text.trim()) {
+          cursorY += lh * 0.6; // blank line spacing
+          return;
+        }
+
+        const lines = doc.splitTextToSize(text, contentW);
+        lines.forEach(line => {
+          if (cursorY + lh > pageH - margin) addNewPage();
+          doc.text(line, margin, cursorY);
+          cursorY += lh + 1;
+        });
+
+        if (isHeading) cursorY += lh * 0.3; // extra space after headings
+      }
+
+      // Walk DOM nodes
+      function processNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const txt = node.textContent;
+          if (txt.trim()) writeLine(txt, false, false, 0);
+          return;
+        }
+        const tag = node.tagName ? node.tagName.toLowerCase() : '';
+        if (tag === 'h1') { writeLine(node.textContent, true, true, 1); }
+        else if (tag === 'h2') { writeLine(node.textContent, true, true, 2); }
+        else if (tag === 'h3' || tag === 'h4') { writeLine(node.textContent, true, true, 3); }
+        else if (tag === 'p') {
+          const txt = node.textContent.trim();
+          if (txt) writeLine(txt, false, false, 0);
+          cursorY += lineHeight * 0.5;
+        }
+        else if (tag === 'br') { cursorY += lineHeight * 0.6; }
+        else if (tag === 'li') {
+          writeLine('• ' + node.textContent.trim(), false, false, 0);
+        }
+        else if (tag === 'strong' || tag === 'b') {
+          writeLine(node.textContent, true, false, 0);
+        }
+        else if (tag === 'table') {
+          // Simple table: just write cell text separated by spaces
+          node.querySelectorAll('tr').forEach(row => {
+            const cells = Array.from(row.querySelectorAll('td,th')).map(c => c.textContent.trim());
+            writeLine(cells.join('   |   '), tag === 'th', false, 0);
+          });
+          cursorY += lineHeight;
+        }
+        else {
+          node.childNodes.forEach(processNode);
+        }
+      }
+
+      tempDiv.childNodes.forEach(processNode);
+
+      setProgress(90, 'Finalising...', 'Almost done!');
+
+      convertedBlob = doc.output('blob');
+
+      setProgress(100, 'Done!', 'PDF ready');
+
+      setTimeout(() => {
+        document.getElementById('progress-card').classList.remove('show');
+        const rc = document.getElementById('result-card');
+        rc.classList.add('show');
+        document.getElementById('rc-title').textContent = '✅ PDF Created Successfully!';
+        document.getElementById('rc-sub').textContent = currentFile.name.replace(/\.docx?$/i, '') + '.pdf — ' + wordCount + ' words';
+        document.getElementById('download-label').textContent = 'Download PDF';
+        triggerDownloadPDF(convertedBlob, currentFile.name.replace(/\.docx?$/i, '') + '.pdf');
+      }, 300);
+
+    } catch (err) {
+      document.getElementById('progress-card').classList.remove('show');
+      showError('❌ Conversion failed: ' + err.message + '. Please make sure the file is a valid .docx Word document.');
+      document.getElementById('pdf-render').innerHTML = '';
+    }
+  }
+
+  async function extractPdfText() {
+    try {
+      setProgress(15, 'Reading PDF...', 'Loading file');
+      const arrayBuffer = await currentFile.arrayBuffer();
+
+      setProgress(35, 'Initialising PDF reader...', 'Loading PDF.js engine');
+
+      setProgress(50, 'Parsing PDF...', 'Reading pages');
+
+      // PDF.js 2.x legacy build — works in all browsers without modules
+      if (typeof pdfjsLib === 'undefined') {
+        throw new Error('PDF.js library not loaded. Please refresh the page and try again.');
+      }
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+
+      const totalPages = pdf.numPages;
+      let fullText = '';
+      let successPages = 0;
+
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        const pct = 50 + Math.round((pageNum / totalPages) * 40);
+        setProgress(pct, `Extracting page ${pageNum} of ${totalPages}...`, 'Reading text content');
+
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+
+        // Build page text preserving line breaks using transform positions
+        let pageText = '';
+        let lastY = null;
+        textContent.items.forEach(item => {
+          const y = item.transform ? item.transform[5] : null;
+          if (lastY !== null && y !== null && Math.abs(y - lastY) > 5) {
+            pageText += '\n';
+          }
+          pageText += item.str;
+          if (item.hasEOL) pageText += '\n';
+          lastY = y;
+        });
+
+        if (pageText.trim().length > 0) {
+          fullText += (pageNum > 1 ? '\n\n--- Page ' + pageNum + ' ---\n\n' : '') + pageText.trim();
+          successPages++;
+        }
+      }
+
+      setProgress(92, 'Finalising...', 'Cleaning up text');
+
+      // Clean up excessive whitespace
+      fullText = fullText
+        .replace(/[ \t]{3,}/g, '  ')
+        .replace(/\n{4,}/g, '\n\n\n')
+        .trim();
+
+      if (!fullText || fullText.length < 10) {
+        fullText = '⚠️ No readable text found in this PDF.\n\nThis PDF appears to be scanned or image-based. The text is embedded as images, not selectable text.\n\nTo extract text from scanned PDFs, use:\n• Adobe Acrobat (File → Export → Text)\n• Google Drive (upload PDF → open with Google Docs)\n• ilovepdf.com OCR tool';
+      }
+
+      convertedText = fullText;
+
+      setProgress(100, 'Done!', 'Text extracted');
+
+      // Show preview
+      const sec = document.getElementById('preview-section');
+      sec.classList.add('show');
+      const previewText = fullText.length > 2000
+        ? fullText.substring(0, 2000) + '\n\n... [preview truncated — full text in download]'
+        : fullText;
+      document.getElementById('preview-body').innerHTML =
+        '<pre style="white-space:pre-wrap;font-size:0.82rem;line-height:1.6">' +
+        previewText.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
+      document.getElementById('preview-count').textContent =
+        totalPages + ' page' + (totalPages !== 1 ? 's' : '') +
+        ' · ' + fullText.split(/\s+/).filter(Boolean).length + ' words extracted';
+
+      setTimeout(() => {
+        document.getElementById('progress-card').classList.remove('show');
+        document.getElementById('result-card').classList.add('show');
+        document.getElementById('rc-title').textContent = '✅ Text Extracted!';
+        document.getElementById('rc-sub').textContent =
+          totalPages + ' pages · ' + fullText.length + ' characters from ' + currentFile.name;
+        document.getElementById('download-label').textContent = '⬇️ Download as .txt';
+        // Auto trigger download
+        downloadTxt();
+      }, 400);
+
+    } catch(err) {
+      document.getElementById('progress-card').classList.remove('show');
+      let msg = err.message || 'Unknown error';
+      if (msg.includes('Invalid PDF') || msg.includes('Missing PDF')) {
+        showError('❌ Invalid PDF file. Please make sure the file is a valid PDF document.');
+      } else if (msg.includes('password')) {
+        showError('❌ This PDF is password-protected. Please remove the password first.');
+      } else {
+        showError('❌ Could not read PDF: ' + msg + '. Try a different PDF file.');
+      }
+    }
+  }
+
+  function downloadResult() {
+    if (currentMode === 'word2pdf' && convertedBlob) {
+      triggerDownloadPDF(convertedBlob, currentFile.name.replace(/\.docx?$/i, '') + '.pdf');
+    } else if (currentMode === 'pdf2word') {
+      if (!convertedText || convertedText.length < 5) {
+        showError('No text available to download. Please convert a PDF first.');
+        return;
+      }
+      const fmt = document.getElementById('opt-pdf-format').value;
+      if (fmt === 'copy') {
+        navigator.clipboard.writeText(convertedText).then(() => {
+          document.getElementById('download-label').textContent = '✅ Copied to clipboard!';
+          setTimeout(() => document.getElementById('download-label').textContent = '⬇️ Download as .txt', 2500);
+        }).catch(() => {
+          // Fallback if clipboard fails
+          downloadTxt();
+        });
+      } else {
+        downloadTxt();
+      }
+    }
+  }
+
+  function downloadTxt() {
+    const filename = (currentFile ? currentFile.name.replace(/\.pdf$/i,'') : 'extracted') + '.txt';
+    triggerDownloadText(convertedText, filename);
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  // Drag and drop
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('drag-over');
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  // ── UNIVERSAL DOWNLOAD FUNCTIONS ─────────────────────────────────────────
+  // These work in regular browsers, sandboxed iframes AND website builders
+
+  function triggerDownloadPDF(blob, filename) {
+    const reader = new FileReader();
+    reader.onloadend = function() {
+      const base64 = reader.result; // data:application/pdf;base64,....
+      _doDownload(base64, filename, blob, 'application/pdf');
+    };
+    reader.readAsDataURL(blob);
+  }
+
+  function triggerDownloadText(text, filename) {
+    const base64 = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+    const blob = new Blob([text], {type:'text/plain'});
+    _doDownload(base64, filename, blob, 'text/plain');
+  }
+
+  function _doDownload(dataUri, filename, blob, mimeType) {
+    // Method 1: Standard anchor click (works in most browsers)
+    try {
+      const a = document.createElement('a');
+      a.href = dataUri;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Show fallback UI after short delay in case click was blocked
+      setTimeout(() => {
+        if (document.getElementById('dl-fallback')) return; // already shown
+        showFallback(dataUri, filename, text || null);
+      }, 1500);
+      return;
+    } catch(e) {
+      console.log('Method 1 failed:', e);
+    }
+
+    // Method 2: Open in new tab
+    try {
+      const win = window.open(dataUri, '_blank');
+      if (win) {
+        showFallback(dataUri, filename, null, 'Your file opened in a new tab. Use Ctrl+S / Cmd+S to save it.');
+        return;
+      }
+    } catch(e) {
+      console.log('Method 2 failed:', e);
+    }
+
+    // Method 3: Show link for manual download
+    showFallback(dataUri, filename, null);
+  }
+
+  function showFallback(dataUri, filename, text, message) {
+    // Remove existing fallback if any
+    const existing = document.getElementById('dl-fallback');
+    if (existing) existing.remove();
+
+    const msg = message || 'Your browser blocked the automatic download. Use the button below:';
+    const div = document.createElement('div');
+    div.id = 'dl-fallback';
+    div.style.cssText = 'margin-top:12px;padding:16px;background:#f0fdf4;border:2px solid #6ee7b7;border-radius:12px;font-family:Inter,sans-serif;font-size:0.85rem;color:#065f46;';
+
+    if (text !== null) {
+      // For text files show copyable textarea
+      div.innerHTML = '<strong>📋 Copy your extracted text:</strong><br><textarea style="width:100%;height:200px;margin-top:8px;padding:10px;border:1px solid #d1fae5;border-radius:8px;font-size:0.8rem;resize:vertical;" readonly>' +
+        (text || '').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>' +
+        '<br><a href="' + dataUri + '" download="' + filename + '" style="display:inline-block;margin-top:8px;padding:10px 20px;background:#059669;color:white;border-radius:8px;text-decoration:none;font-weight:700;">⬇️ Click here to download .txt</a>';
+    } else {
+      div.innerHTML = '<strong>⬇️ ' + msg + '</strong><br><br>' +
+        '<a href="' + dataUri + '" download="' + filename + '" style="display:inline-block;padding:12px 24px;background:#059669;color:white;border-radius:10px;text-decoration:none;font-weight:700;font-size:0.95rem;">⬇️ Download ' + filename + '</a>' +
+        '<br><small style="display:block;margin-top:8px;color:#6b7280;">If the button above does not work, right-click it and choose Save link as...</small>';
+    }
+    document.getElementById('result-card').appendChild(div);
+  }
+
+</script>
+</body>
+</html>
