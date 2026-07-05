@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weather — My Location & City Comparison</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #060d1f;
+    --surface: #0d1730;
+    --surface2: #132040;
+    --border: #1e3058;
+    --text: #e8f0fe;
+    --muted: #7a9cc8;
+    --accent: #4fc3f7;
+    --accent2: #81d4fa;
+    --gold: #ffd54f;
+    --green: #69f0ae;
+    --red: #ff5252;
+    --orange: #ffab40;
+  }
+
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 0; }
+
+  /* Sky background */
+  .sky-bg {
+    position: fixed; inset: 0; z-index: 0;
+    background: linear-gradient(180deg, #060d1f 0%, #0a1628 50%, #060d1f 100%);
+    overflow: hidden;
+  }
+
+  .star { position: absolute; border-radius: 50%; background: white; animation: twinkle 3s infinite alternate; }
+  @keyframes twinkle { from { opacity: 0.2; } to { opacity: 0.8; } }
+
+  .page { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+
+  /* Header */
+  .header { text-align: center; margin-bottom: 28px; }
+  .eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .header h1 { font-family: 'Outfit', sans-serif; font-size: clamp(1.8rem,5vw,2.8rem); font-weight: 800; color: var(--text); letter-spacing: -0.02em; margin-bottom: 6px; }
+  .header p { color: var(--muted); font-size: 0.88rem; }
+
+  /* Tabs */
+  .tabs { display: flex; background: var(--surface); border-radius: 14px; padding: 4px; gap: 4px; margin-bottom: 20px; border: 1px solid var(--border); }
+  .tab-btn { flex: 1; padding: 11px; border: none; border-radius: 10px; font-weight: 700; font-size: 0.88rem; cursor: pointer; background: none; color: var(--muted); transition: all 0.2s; font-family: 'Inter', sans-serif; }
+  .tab-btn.active { background: var(--accent); color: #060d1f; }
+
+  /* Cards */
+  .card { background: var(--surface); border-radius: 20px; padding: 22px; border: 1px solid var(--border); margin-bottom: 16px; backdrop-filter: blur(10px); }
+
+  /* Location button */
+  .loc-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #1565c0, #0288d1); color: white; font-weight: 700; font-size: 0.95rem; border: none; border-radius: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; font-family: 'Inter', sans-serif; margin-bottom: 12px; }
+  .loc-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(2,136,209,0.3); }
+  .loc-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .or-divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 0.78rem; margin-bottom: 12px; }
+  .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .search-wrap { display: flex; gap: 8px; }
+  .city-input { flex: 1; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 16px; font-size: 0.95rem; font-family: 'Inter', sans-serif; color: var(--text); outline: none; transition: border-color 0.2s; }
+  .city-input:focus { border-color: var(--accent); }
+  .city-input::placeholder { color: var(--muted); }
+  .search-btn { background: var(--accent); color: #060d1f; font-weight: 700; font-size: 0.88rem; border: none; border-radius: 12px; padding: 12px 18px; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+  .search-btn:hover { opacity: 0.88; }
+
+  /* Current weather hero */
+  .weather-hero { border-radius: 20px; padding: 28px; margin-bottom: 16px; position: relative; overflow: hidden; border: 1px solid var(--border); }
+  .wh-bg { position: absolute; inset: 0; z-index: 0; }
+  .wh-content { position: relative; z-index: 1; }
+  .wh-location { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(255,255,255,0.7); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .wh-city { font-family: 'Outfit', sans-serif; font-size: clamp(1.4rem,4vw,2rem); font-weight: 800; color: white; margin-bottom: 4px; }
+  .wh-time { font-size: 0.78rem; color: rgba(255,255,255,0.6); margin-bottom: 20px; }
+  .wh-main { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+  .wh-temp { font-family: 'Outfit', sans-serif; font-size: clamp(4rem,14vw,7rem); font-weight: 800; color: white; line-height: 1; }
+  .wh-temp-unit { font-size: 2rem; opacity: 0.7; }
+  .wh-right .wh-icon { font-size: 3.5rem; line-height: 1; margin-bottom: 4px; }
+  .wh-right .wh-desc { font-size: 0.9rem; color: rgba(255,255,255,0.85); font-weight: 600; }
+  .wh-right .wh-feels { font-size: 0.78rem; color: rgba(255,255,255,0.6); margin-top: 2px; }
+  .wh-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (max-width: 500px) { .wh-stats { grid-template-columns: 1fr 1fr; } }
+  .wh-stat { background: rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; text-align: center; backdrop-filter: blur(4px); }
+  .wh-stat .ws-icon { font-size: 1.2rem; margin-bottom: 4px; }
+  .wh-stat .ws-val { font-weight: 700; font-size: 0.95rem; color: white; margin-bottom: 2px; }
+  .wh-stat .ws-lbl { font-size: 0.65rem; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.07em; }
+
+  /* Hourly forecast */
+  .hourly-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .hour-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 10px; text-align: center; flex-shrink: 0; min-width: 64px; transition: all 0.2s; }
+  .hour-item.now { border-color: var(--accent); background: rgba(79,195,247,0.12); }
+  .hour-item .hi-time { font-size: 0.68rem; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+  .hour-item .hi-icon { font-size: 1.3rem; margin-bottom: 6px; }
+  .hour-item .hi-temp { font-weight: 700; font-size: 0.9rem; color: var(--text); margin-bottom: 2px; }
+  .hour-item .hi-rain { font-size: 0.65rem; color: var(--accent); }
+
+  /* 7 day forecast */
+  .day-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .day-row:last-child { border-bottom: none; }
+  .dr-day { font-size: 0.82rem; font-weight: 600; color: var(--text); width: 80px; flex-shrink: 0; }
+  .dr-icon { font-size: 1.4rem; flex-shrink: 0; width: 32px; text-align: center; }
+  .dr-desc { font-size: 0.75rem; color: var(--muted); flex: 1; }
+  .dr-temps { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+  .dr-low { font-size: 0.82rem; color: var(--muted); font-weight: 500; }
+  .dr-high { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+  .dr-rain { font-size: 0.72rem; color: var(--accent); flex-shrink: 0; width: 36px; text-align: right; }
+
+  /* Section title */
+  .sec-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+  /* Compare tab */
+  .compare-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  @media (max-width: 500px) { .compare-inputs { grid-template-columns: 1fr; } }
+  .comp-input-wrap { position: relative; }
+  .comp-num { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 0.72rem; font-weight: 800; color: var(--accent); background: rgba(79,195,247,0.12); border-radius: 6px; padding: 2px 6px; pointer-events: none; }
+  .comp-city-input { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 12px 12px 46px; font-size: 0.9rem; font-family: 'Inter', sans-serif; color: var(--text); outline: none; transition: border-color 0.2s; }
+  .comp-city-input:focus { border-color: var(--accent); }
+  .comp-city-input::placeholder { color: var(--muted); }
+
+  .compare-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #1565c0, #0288d1); color: white; font-weight: 700; font-size: 0.95rem; border: none; border-radius: 14px; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; margin-bottom: 16px; }
+  .compare-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .compare-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Compare cards */
+  .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .comp-card { border-radius: 18px; padding: 20px; border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .comp-card .cc-bg { position: absolute; inset: 0; z-index: 0; }
+  .comp-card .cc-content { position: relative; z-index: 1; }
+  .cc-city { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: white; margin-bottom: 2px; }
+  .cc-region { font-size: 0.7rem; color: rgba(255,255,255,0.6); margin-bottom: 14px; }
+  .cc-temp { font-family: 'Outfit', sans-serif; font-size: 2.8rem; font-weight: 800; color: white; line-height: 1; margin-bottom: 4px; }
+  .cc-icon { font-size: 1.8rem; margin-bottom: 6px; }
+  .cc-desc { font-size: 0.8rem; color: rgba(255,255,255,0.8); font-weight: 600; margin-bottom: 10px; }
+  .cc-mini-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .cc-mini-stat { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 7px 8px; }
+  .cc-mini-stat .cms-val { font-size: 0.82rem; font-weight: 700; color: white; }
+  .cc-mini-stat .cms-lbl { font-size: 0.62rem; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.05em; }
+  .cc-rank { position: absolute; top: 14px; right: 14px; background: rgba(255,255,255,0.15); color: white; font-size: 0.68rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+
+  /* Temp diff bar */
+  .diff-section { margin-bottom: 16px; }
+  .diff-bar-wrap { margin-bottom: 10px; }
+  .diff-bar-header { display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  .diff-bar-track { background: var(--border); border-radius: 6px; height: 10px; overflow: hidden; position: relative; }
+  .diff-bar-fill { height: 100%; border-radius: 6px; transition: width 0.6s; }
+
+  /* Loading */
+  .loading { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .spin { display: inline-block; font-size: 2rem; animation: spin 1s linear infinite; margin-bottom: 12px; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  /* Error */
+  .error-msg { background: rgba(255,82,82,0.1); border: 1px solid rgba(255,82,82,0.3); border-radius: 12px; padding: 14px 16px; font-size: 0.85rem; color: #ff8a80; margin-bottom: 14px; display: none; }
+  .error-msg.show { display: block; }
+
+  /* AQI */
+  .aqi-badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 20px; padding: 4px 12px; font-size: 0.78rem; font-weight: 700; margin-top: 8px; }
+
+  .unit-row { display: flex; gap: 8px; margin-bottom: 14px; justify-content: flex-end; }
+  .unit-pill { background: none; border: 1.5px solid var(--border); color: var(--muted); font-size: 0.78rem; font-weight: 700; padding: 5px 12px; border-radius: 20px; cursor: pointer; transition: all 0.18s; }
+  .unit-pill.active { border-color: var(--accent); color: var(--accent); background: rgba(79,195,247,0.08); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="sky-bg" id="sky-bg"></div>
+
+<div class="page">
+  <div id="local-warning" style="display:none;background:rgba(255,171,64,0.12);border:1px solid rgba(255,171,64,0.4);border-radius:14px;padding:14px 18px;margin-bottom:18px;font-size:0.85rem;color:#ffab40;line-height:1.6">
+    ⚠️ <strong>Running as a local file</strong> — Weather APIs are blocked by your browser for security reasons when opening HTML files directly from your computer.<br>
+    <strong>Fix:</strong> Upload this file to your Hostinger website and open it from there — it will work perfectly. Or use a local server like VS Code Live Server extension.
+  </div>
+  <div class="header">
+    <div class="eyebrow">🌤️ Live Weather</div>
+    <h1>Weather Tool</h1>
+    <p>Hyperlocal current weather + compare any cities side by side</p>
+  </div>
+
+  <div class="unit-row">
+    <button class="unit-pill active" id="pill-c" onclick="setTempUnit('C')">°C</button>
+    <button class="unit-pill" id="pill-f" onclick="setTempUnit('F')">°F</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-my" onclick="switchTab('my')">📍 My Weather</button>
+    <button class="tab-btn" id="tab-cmp" onclick="switchTab('cmp')">🔀 Compare Cities</button>
+  </div>
+
+  <!-- MY WEATHER TAB -->
+  <div class="tab-panel active" id="panel-my">
+    <div class="card">
+      <button class="loc-btn" id="loc-btn" onclick="detectLocation()">
+        📍 Detect My Location Automatically
+      </button>
+      <div class="or-divider">or search manually</div>
+      <div class="search-wrap">
+        <input type="text" class="city-input" id="my-city-input" placeholder="Type city name e.g. Dwarka, Delhi…" onkeydown="if(event.key==='Enter')searchMyCity()">
+        <button class="search-btn" onclick="searchMyCity()">Search</button>
+      </div>
+    </div>
+
+    <div class="error-msg" id="my-error"></div>
+    <div id="my-loading" style="display:none" class="loading"><div class="spin">🌀</div><div>Fetching weather data…</div></div>
+    <div id="my-results" style="display:none">
+
+      <!-- Hero -->
+      <div class="weather-hero" id="my-hero">
+        <div class="wh-bg" id="my-hero-bg"></div>
+        <div class="wh-content">
+          <div class="wh-location">📍 <span id="my-loc-label">Detecting…</span></div>
+          <div class="wh-city" id="my-city-name">—</div>
+          <div class="wh-time" id="my-time">—</div>
+          <div class="wh-main">
+            <div class="wh-temp"><span id="my-temp">—</span><span class="wh-temp-unit" id="my-temp-unit">°C</span></div>
+            <div class="wh-right">
+              <div class="wh-icon" id="my-icon">🌤️</div>
+              <div class="wh-desc" id="my-desc">—</div>
+              <div class="wh-feels">Feels like <span id="my-feels">—</span></div>
+            </div>
+          </div>
+          <div class="wh-stats">
+            <div class="wh-stat"><div class="ws-icon">💧</div><div class="ws-val" id="my-humidity">—</div><div class="ws-lbl">Humidity</div></div>
+            <div class="wh-stat"><div class="ws-icon">💨</div><div class="ws-val" id="my-wind">—</div><div class="ws-lbl">Wind</div></div>
+            <div class="wh-stat"><div class="ws-icon">☀️</div><div class="ws-val" id="my-uv">—</div><div class="ws-lbl">UV Index</div></div>
+            <div class="wh-stat"><div class="ws-icon">👁️</div><div class="ws-val" id="my-vis">—</div><div class="ws-lbl">Visibility</div></div>
+          </div>
+          <div id="my-aqi-wrap"></div>
+        </div>
+      </div>
+
+      <!-- Hourly -->
+      <div class="card">
+        <div class="sec-title">⏰ Next 24 Hours</div>
+        <div class="hourly-scroll" id="my-hourly"></div>
+      </div>
+
+      <!-- 7 day -->
+      <div class="card">
+        <div class="sec-title">📅 7-Day Forecast</div>
+        <div id="my-weekly"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- COMPARE TAB -->
+  <div class="tab-panel" id="panel-cmp">
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:12px">🏙️ Enter Cities to Compare (2–4)</div>
+      <div class="compare-inputs">
+        <div class="comp-input-wrap">
+          <span class="comp-num">1</span>
+          <input type="text" class="comp-city-input" id="cc1" placeholder="e.g. Dwarka Delhi" onkeydown="if(event.key==='Enter')compareAll()">
+        </div>
+        <div class="comp-input-wrap">
+          <span class="comp-num">2</span>
+          <input type="text" class="comp-city-input" id="cc2" placeholder="e.g. Dwarka Delhi" onkeydown="if(event.key==='Enter')compareAll()">
+        </div>
+        <div class="comp-input-wrap">
+          <span class="comp-num" style="color:#69f0ae">3</span>
+          <input type="text" class="comp-city-input" id="cc3" placeholder="Optional e.g. Dharamkot" onkeydown="if(event.key==='Enter')compareAll()">
+        </div>
+        <div class="comp-input-wrap">
+          <span class="comp-num" style="color:#ffd54f">4</span>
+          <input type="text" class="comp-city-input" id="cc4" placeholder="Optional e.g. Shimla" onkeydown="if(event.key==='Enter')compareAll()">
+        </div>
+      </div>
+      <button class="compare-btn" id="compare-btn" onclick="compareAll()">⚡ Compare Weather Now</button>
+    </div>
+
+    <div class="error-msg" id="cmp-error"></div>
+    <div id="cmp-loading" style="display:none" class="loading"><div class="spin">🌀</div><div>Fetching weather for all cities…</div></div>
+    <div id="cmp-results" style="display:none">
+      <div class="compare-grid" id="compare-grid"></div>
+      <div class="card diff-section">
+        <div class="sec-title">🌡️ Temperature Comparison</div>
+        <div id="diff-bars"></div>
+      </div>
+      <div class="card">
+        <div class="sec-title">📅 7-Day Forecast Comparison</div>
+        <div id="cmp-weekly"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── Globals ──────────────────────────────────────────
+  let tempUnit = 'C';
+
+  // Weather code → {desc, icon, gradient}
+  const WC = {
+    0:  { d:'Clear Sky',           i:'☀️',  g:'linear-gradient(160deg,#1565c0,#0288d1)' },
+    1:  { d:'Mainly Clear',        i:'🌤️', g:'linear-gradient(160deg,#1565c0,#0288d1)' },
+    2:  { d:'Partly Cloudy',       i:'⛅',  g:'linear-gradient(160deg,#1976d2,#455a64)' },
+    3:  { d:'Overcast',            i:'☁️',  g:'linear-gradient(160deg,#37474f,#546e7a)' },
+    45: { d:'Foggy',               i:'🌫️', g:'linear-gradient(160deg,#455a64,#607d8b)' },
+    48: { d:'Rime Fog',            i:'🌫️', g:'linear-gradient(160deg,#37474f,#607d8b)' },
+    51: { d:'Light Drizzle',       i:'🌦️', g:'linear-gradient(160deg,#1a237e,#0288d1)' },
+    53: { d:'Moderate Drizzle',    i:'🌧️', g:'linear-gradient(160deg,#1a237e,#0277bd)' },
+    55: { d:'Heavy Drizzle',       i:'🌧️', g:'linear-gradient(160deg,#0d47a1,#01579b)' },
+    61: { d:'Slight Rain',         i:'🌦️', g:'linear-gradient(160deg,#1a237e,#0288d1)' },
+    63: { d:'Moderate Rain',       i:'🌧️', g:'linear-gradient(160deg,#0d47a1,#01579b)' },
+    65: { d:'Heavy Rain',          i:'⛈️', g:'linear-gradient(160deg,#0d47a1,#006064)' },
+    71: { d:'Slight Snow',         i:'🌨️', g:'linear-gradient(160deg,#78909c,#b0bec5)' },
+    73: { d:'Moderate Snow',       i:'❄️',  g:'linear-gradient(160deg,#607d8b,#cfd8dc)' },
+    75: { d:'Heavy Snow',          i:'❄️',  g:'linear-gradient(160deg,#546e7a,#eceff1)' },
+    80: { d:'Slight Showers',      i:'🌦️', g:'linear-gradient(160deg,#1a237e,#0288d1)' },
+    81: { d:'Moderate Showers',    i:'🌧️', g:'linear-gradient(160deg,#0d47a1,#01579b)' },
+    82: { d:'Violent Showers',     i:'⛈️', g:'linear-gradient(160deg,#0d47a1,#006064)' },
+    95: { d:'Thunderstorm',        i:'⛈️', g:'linear-gradient(160deg,#1a237e,#263238)' },
+    96: { d:'Thunderstorm+Hail',   i:'⛈️', g:'linear-gradient(160deg,#0d47a1,#263238)' },
+    99: { d:'Heavy Thunderstorm',  i:'🌩️', g:'linear-gradient(160deg,#000051,#1a237e)' },
+  };
+
+  function wc(code) { return WC[code] || { d:'Unknown', i:'🌡️', g:'linear-gradient(160deg,#1565c0,#0288d1)' }; }
+
+  function toF(c) { return (c * 9/5 + 32).toFixed(1); }
+  function dispTemp(c) { return tempUnit === 'C' ? Math.round(c) + '°C' : Math.round(c * 9/5 + 32) + '°F'; }
+  function dispTempNum(c) { return tempUnit === 'C' ? Math.round(c) : Math.round(c * 9/5 + 32); }
+
+  function setTempUnit(u) {
+    tempUnit = u;
+    document.getElementById('pill-c').classList.toggle('active', u === 'C');
+    document.getElementById('pill-f').classList.toggle('active', u === 'F');
+    if (lastMyData) renderMyWeather(lastMyData);
+    if (lastCmpData.length) renderCompare(lastCmpData);
+  }
+
+  function switchTab(t) {
+    document.getElementById('tab-my').classList.toggle('active', t === 'my');
+    document.getElementById('tab-cmp').classList.toggle('active', t === 'cmp');
+    document.getElementById('panel-my').classList.toggle('active', t === 'my');
+    document.getElementById('panel-cmp').classList.toggle('active', t === 'cmp');
+  }
+
+  // ── Stars ────────────────────────────────────────────
+  // Show local file warning
+  if (window.location.protocol === 'file:') {
+    document.getElementById('local-warning').style.display = 'block';
+  }
+
+  (function createStars() {
+    const sky = document.getElementById('sky-bg');
+    for (let i = 0; i < 80; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      const sz = Math.random() * 2 + 0.5;
+      s.style.cssText = `width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*100}%;animation-delay:${Math.random()*3}s;animation-duration:${2+Math.random()*3}s`;
+      sky.appendChild(s);
+    }
+  })();
+
+  // ── Geocoding ─────────────────────────────────────────
+  // ── Built-in Indian cities database ─────────────────────
+  // Fallback for cities that APIs may not find
+  const INDIA_CITIES = {
+    'najafgarh':          {lat:28.6092,lon:76.9798,name:'Najafgarh',admin1:'Delhi'},
+    'dwarka':             {lat:28.5921,lon:77.0460,name:'Dwarka',admin1:'Delhi'},
+    'dwarka delhi':       {lat:28.5921,lon:77.0460,name:'Dwarka',admin1:'Delhi'},
+    'dwarka gujarat':     {lat:22.2394,lon:68.9678,name:'Dwarka',admin1:'Gujarat'},
+    'delhi':              {lat:28.6139,lon:77.2090,name:'Delhi',admin1:'Delhi'},
+    'new delhi':          {lat:28.6139,lon:77.2090,name:'New Delhi',admin1:'Delhi'},
+    'mumbai':             {lat:19.0760,lon:72.8777,name:'Mumbai',admin1:'Maharashtra'},
+    'bangalore':          {lat:12.9716,lon:77.5946,name:'Bengaluru',admin1:'Karnataka'},
+    'bengaluru':          {lat:12.9716,lon:77.5946,name:'Bengaluru',admin1:'Karnataka'},
+    'chennai':            {lat:13.0827,lon:80.2707,name:'Chennai',admin1:'Tamil Nadu'},
+    'hyderabad':          {lat:17.3850,lon:78.4867,name:'Hyderabad',admin1:'Telangana'},
+    'kolkata':            {lat:22.5726,lon:88.3639,name:'Kolkata',admin1:'West Bengal'},
+    'pune':               {lat:18.5204,lon:73.8567,name:'Pune',admin1:'Maharashtra'},
+    'ahmedabad':          {lat:23.0225,lon:72.5714,name:'Ahmedabad',admin1:'Gujarat'},
+    'jaipur':             {lat:26.9124,lon:75.7873,name:'Jaipur',admin1:'Rajasthan'},
+    'lucknow':            {lat:26.8467,lon:80.9462,name:'Lucknow',admin1:'Uttar Pradesh'},
+    'kanpur':             {lat:26.4499,lon:80.3319,name:'Kanpur',admin1:'Uttar Pradesh'},
+    'nagpur':             {lat:21.1458,lon:79.0882,name:'Nagpur',admin1:'Maharashtra'},
+    'indore':             {lat:22.7196,lon:75.8577,name:'Indore',admin1:'Madhya Pradesh'},
+    'bhopal':             {lat:23.2599,lon:77.4126,name:'Bhopal',admin1:'Madhya Pradesh'},
+    'visakhapatnam':      {lat:17.6868,lon:83.2185,name:'Visakhapatnam',admin1:'Andhra Pradesh'},
+    'patna':              {lat:25.5941,lon:85.1376,name:'Patna',admin1:'Bihar'},
+    'vadodara':           {lat:22.3072,lon:73.1812,name:'Vadodara',admin1:'Gujarat'},
+    'ghaziabad':          {lat:28.6692,lon:77.4538,name:'Ghaziabad',admin1:'Uttar Pradesh'},
+    'ludhiana':           {lat:30.9010,lon:75.8573,name:'Ludhiana',admin1:'Punjab'},
+    'agra':               {lat:27.1767,lon:78.0081,name:'Agra',admin1:'Uttar Pradesh'},
+    'nashik':             {lat:19.9975,lon:73.7898,name:'Nashik',admin1:'Maharashtra'},
+    'faridabad':          {lat:28.4089,lon:77.3178,name:'Faridabad',admin1:'Haryana'},
+    'meerut':             {lat:28.9845,lon:77.7064,name:'Meerut',admin1:'Uttar Pradesh'},
+    'rajkot':             {lat:22.3039,lon:70.8022,name:'Rajkot',admin1:'Gujarat'},
+    'varanasi':           {lat:25.3176,lon:82.9739,name:'Varanasi',admin1:'Uttar Pradesh'},
+    'srinagar':           {lat:34.0837,lon:74.7973,name:'Srinagar',admin1:'Jammu & Kashmir'},
+    'aurangabad':         {lat:19.8762,lon:75.3433,name:'Aurangabad',admin1:'Maharashtra'},
+    'dhanbad':            {lat:23.7957,lon:86.4304,name:'Dhanbad',admin1:'Jharkhand'},
+    'amritsar':           {lat:31.6340,lon:74.8723,name:'Amritsar',admin1:'Punjab'},
+    'allahabad':          {lat:25.4358,lon:81.8463,name:'Prayagraj',admin1:'Uttar Pradesh'},
+    'prayagraj':          {lat:25.4358,lon:81.8463,name:'Prayagraj',admin1:'Uttar Pradesh'},
+    'ranchi':             {lat:23.3441,lon:85.3096,name:'Ranchi',admin1:'Jharkhand'},
+    'howrah':             {lat:22.5958,lon:88.2636,name:'Howrah',admin1:'West Bengal'},
+    'coimbatore':         {lat:11.0168,lon:76.9558,name:'Coimbatore',admin1:'Tamil Nadu'},
+    'vijayawada':         {lat:16.5062,lon:80.6480,name:'Vijayawada',admin1:'Andhra Pradesh'},
+    'jodhpur':            {lat:26.2389,lon:73.0243,name:'Jodhpur',admin1:'Rajasthan'},
+    'madurai':            {lat:9.9252,lon:78.1198,name:'Madurai',admin1:'Tamil Nadu'},
+    'raipur':             {lat:21.2514,lon:81.6296,name:'Raipur',admin1:'Chhattisgarh'},
+    'kochi':              {lat:9.9312,lon:76.2673,name:'Kochi',admin1:'Kerala'},
+    'chandigarh':         {lat:30.7333,lon:76.7794,name:'Chandigarh',admin1:'Chandigarh'},
+    'guwahati':           {lat:26.1445,lon:91.7362,name:'Guwahati',admin1:'Assam'},
+    'solapur':            {lat:17.6599,lon:75.9064,name:'Solapur',admin1:'Maharashtra'},
+    'hubballi':           {lat:15.3647,lon:75.1240,name:'Hubballi',admin1:'Karnataka'},
+    'tiruchirappalli':    {lat:10.7905,lon:78.7047,name:'Tiruchirappalli',admin1:'Tamil Nadu'},
+    'bareilly':           {lat:28.3670,lon:79.4304,name:'Bareilly',admin1:'Uttar Pradesh'},
+    'moradabad':          {lat:28.8386,lon:78.7733,name:'Moradabad',admin1:'Uttar Pradesh'},
+    'mysore':             {lat:12.2958,lon:76.6394,name:'Mysuru',admin1:'Karnataka'},
+    'mysuru':             {lat:12.2958,lon:76.6394,name:'Mysuru',admin1:'Karnataka'},
+    'gurgaon':            {lat:28.4595,lon:77.0266,name:'Gurgaon',admin1:'Haryana'},
+    'gurugram':           {lat:28.4595,lon:77.0266,name:'Gurugram',admin1:'Haryana'},
+    'noida':              {lat:28.5355,lon:77.3910,name:'Noida',admin1:'Uttar Pradesh'},
+    'shimla':             {lat:31.1048,lon:77.1734,name:'Shimla',admin1:'Himachal Pradesh'},
+    'manali':             {lat:32.2396,lon:77.1887,name:'Manali',admin1:'Himachal Pradesh'},
+    'mcleodganj':         {lat:32.2427,lon:76.3234,name:'McLeodganj',admin1:'Himachal Pradesh'},
+    'dharamshala':        {lat:32.2190,lon:76.3234,name:'Dharamshala',admin1:'Himachal Pradesh'},
+    'rishikesh':          {lat:30.0869,lon:78.2676,name:'Rishikesh',admin1:'Uttarakhand'},
+    'haridwar':           {lat:29.9457,lon:78.1642,name:'Haridwar',admin1:'Uttarakhand'},
+    'dehradun':           {lat:30.3165,lon:78.0322,name:'Dehradun',admin1:'Uttarakhand'},
+    'ujjain':             {lat:23.1765,lon:75.7885,name:'Ujjain',admin1:'Madhya Pradesh'},
+    'mathura':            {lat:27.4924,lon:77.6737,name:'Mathura',admin1:'Uttar Pradesh'},
+    'vrindavan':          {lat:27.5794,lon:77.6965,name:'Vrindavan',admin1:'Uttar Pradesh'},
+    'ayodhya':            {lat:26.7922,lon:82.1998,name:'Ayodhya',admin1:'Uttar Pradesh'},
+    'pushkar':            {lat:26.4897,lon:74.5511,name:'Pushkar',admin1:'Rajasthan'},
+    'udaipur':            {lat:24.5854,lon:73.7125,name:'Udaipur',admin1:'Rajasthan'},
+    'jaisalmer':          {lat:26.9157,lon:70.9083,name:'Jaisalmer',admin1:'Rajasthan'},
+    'goa':                {lat:15.2993,lon:74.1240,name:'Goa',admin1:'Goa'},
+    'panaji':             {lat:15.4909,lon:73.8278,name:'Panaji',admin1:'Goa'},
+    'ooty':               {lat:11.4102,lon:76.6950,name:'Ooty',admin1:'Tamil Nadu'},
+    'munnar':             {lat:10.0889,lon:77.0595,name:'Munnar',admin1:'Kerala'},
+    'thiruvananthapuram': {lat:8.5241,lon:76.9366,name:'Thiruvananthapuram',admin1:'Kerala'},
+    'trivandrum':         {lat:8.5241,lon:76.9366,name:'Thiruvananthapuram',admin1:'Kerala'},
+    'calicut':            {lat:11.2588,lon:75.7804,name:'Kozhikode',admin1:'Kerala'},
+    'kozhikode':          {lat:11.2588,lon:75.7804,name:'Kozhikode',admin1:'Kerala'},
+    'thrissur':           {lat:10.5276,lon:76.2144,name:'Thrissur',admin1:'Kerala'},
+    'bhubaneswar':        {lat:20.2961,lon:85.8245,name:'Bhubaneswar',admin1:'Odisha'},
+    'puri':               {lat:19.8135,lon:85.8312,name:'Puri',admin1:'Odisha'},
+    'tirupati':           {lat:13.6288,lon:79.4192,name:'Tirupati',admin1:'Andhra Pradesh'},
+    'shirdi':             {lat:19.7674,lon:74.4777,name:'Shirdi',admin1:'Maharashtra'},
+    'nashik':             {lat:19.9975,lon:73.7898,name:'Nashik',admin1:'Maharashtra'},
+    'jammu':              {lat:32.7266,lon:74.8570,name:'Jammu',admin1:'Jammu & Kashmir'},
+    'leh':                {lat:34.1526,lon:77.5771,name:'Leh',admin1:'Ladakh'},
+    'spiti':              {lat:32.2461,lon:78.0337,name:'Spiti',admin1:'Himachal Pradesh'},
+    'kasol':              {lat:32.0093,lon:77.3148,name:'Kasol',admin1:'Himachal Pradesh'},
+    'kullu':              {lat:31.9578,lon:77.1095,name:'Kullu',admin1:'Himachal Pradesh'},
+    'nainital':           {lat:29.3803,lon:79.4636,name:'Nainital',admin1:'Uttarakhand'},
+    'mussoorie':          {lat:30.4539,lon:78.0644,name:'Mussoorie',admin1:'Uttarakhand'},
+    'darjeeling':         {lat:27.0360,lon:88.2627,name:'Darjeeling',admin1:'West Bengal'},
+    'gangtok':            {lat:27.3389,lon:88.6065,name:'Gangtok',admin1:'Sikkim'},
+    'shillong':           {lat:25.5788,lon:91.8933,name:'Shillong',admin1:'Meghalaya'},
+    'imphal':             {lat:24.8170,lon:93.9368,name:'Imphal',admin1:'Manipur'},
+    'port blair':         {lat:11.6234,lon:92.7265,name:'Port Blair',admin1:'Andaman & Nicobar'},
+    'surat':              {lat:21.1702,lon:72.8311,name:'Surat',admin1:'Gujarat'},
+    'rohtak':             {lat:28.8955,lon:76.6066,name:'Rohtak',admin1:'Haryana'},
+    'panipat':            {lat:29.3909,lon:76.9635,name:'Panipat',admin1:'Haryana'},
+    'karnal':             {lat:29.6857,lon:76.9905,name:'Karnal',admin1:'Haryana'},
+    'hisar':              {lat:29.1492,lon:75.7217,name:'Hisar',admin1:'Haryana'},
+    'ambala':             {lat:30.3782,lon:76.7767,name:'Ambala',admin1:'Haryana'},
+    'bathinda':           {lat:30.2110,lon:74.9455,name:'Bathinda',admin1:'Punjab'},
+    'patiala':            {lat:30.3398,lon:76.3869,name:'Patiala',admin1:'Punjab'},
+    'jalandhar':          {lat:31.3260,lon:75.5762,name:'Jalandhar',admin1:'Punjab'},
+    'gorakhpur':          {lat:26.7606,lon:83.3732,name:'Gorakhpur',admin1:'Uttar Pradesh'},
+    'aligarh':            {lat:27.8974,lon:78.0880,name:'Aligarh',admin1:'Uttar Pradesh'},
+    'gwalior':            {lat:26.2183,lon:78.1828,name:'Gwalior',admin1:'Madhya Pradesh'},
+    'jabalpur':           {lat:23.1815,lon:79.9864,name:'Jabalpur',admin1:'Madhya Pradesh'},
+    'bikaner':            {lat:28.0229,lon:73.3119,name:'Bikaner',admin1:'Rajasthan'},
+    'ajmer':              {lat:26.4499,lon:74.6399,name:'Ajmer',admin1:'Rajasthan'},
+    'kota':               {lat:25.2138,lon:75.8648,name:'Kota',admin1:'Rajasthan'},
+    'hampi':              {lat:15.3350,lon:76.4600,name:'Hampi',admin1:'Karnataka'},
+    'hospet':             {lat:15.2689,lon:76.3870,name:'Hospet',admin1:'Karnataka'},
+    'mangalore':          {lat:12.9141,lon:74.8560,name:'Mangaluru',admin1:'Karnataka'},
+    'udupi':              {lat:13.3409,lon:74.7421,name:'Udupi',admin1:'Karnataka'},
+    'belgaum':            {lat:15.8497,lon:74.4977,name:'Belagavi',admin1:'Karnataka'},
+    'salem':              {lat:11.6643,lon:78.1460,name:'Salem',admin1:'Tamil Nadu'},
+    'vellore':            {lat:12.9165,lon:79.1325,name:'Vellore',admin1:'Tamil Nadu'},
+    'pondicherry':        {lat:11.9416,lon:79.8083,name:'Puducherry',admin1:'Puducherry'},
+    'puducherry':         {lat:11.9416,lon:79.8083,name:'Puducherry',admin1:'Puducherry'},
+  };
+
+  function lookupCityDB(query) {
+    const key = query.toLowerCase().replace(/,/g,' ').replace(/  +/g,' ').trim();
+    // 1. Exact match
+    if (INDIA_CITIES[key]) {
+      const c = INDIA_CITIES[key];
+      return { latitude: c.lat, longitude: c.lon, name: c.name, admin1: c.admin1, country: 'India' };
+    }
+    // 2. Key starts with query — only if query is at least 4 chars to avoid false matches
+    if (key.length >= 4) {
+      for (const [k, c] of Object.entries(INDIA_CITIES)) {
+        if (k === key || k.startsWith(key + ' ') || key.startsWith(k + ' ') || key.startsWith(k)) {
+          return { latitude: c.lat, longitude: c.lon, name: c.name, admin1: c.admin1, country: 'India' };
+        }
+      }
+    }
+    return null;
+  }
+
+  async function geocode(rawQuery) {
+    // Clean input
+    const query = rawQuery.replace(/,/g, ' ').replace(/  +/g, ' ').trim();
+    const words = query.split(' ').filter(Boolean);
+
+    // Step 1: Check built-in city database first — instant, no API needed
+    const dbResult = lookupCityDB(query);
+    if (dbResult) return dbResult;
+    // Also try first word only in DB
+    if (words.length > 1) {
+      const dbResult2 = lookupCityDB(words[0]);
+      if (dbResult2) return dbResult2;
+    }
+
+    // Step 2: Try APIs
+    const attempts = [query, words[0]];
+    if (words.length > 2) attempts.push(words[0] + ' ' + words[1]);
+
+    for (const attempt of [...new Set(attempts)]) {
+      // Open-Meteo
+      for (const q of [attempt, attempt + ' India']) {
+        try {
+          const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' +
+            encodeURIComponent(q) + '&count=10&language=en&format=json';
+          const r = await fetch(url, { mode: 'cors' });
+          if (!r.ok) continue;
+          const d = await r.json();
+          if (d.results && d.results.length > 0) {
+            const india = d.results.find(x => x.country_code === 'IN') || d.results[0];
+            return { latitude: india.latitude, longitude: india.longitude, name: india.name, admin1: india.admin1 || '', country: india.country || 'India' };
+          }
+        } catch(e) {}
+      }
+      // Nominatim
+      for (const q of [attempt + ', India', attempt]) {
+        try {
+          const url = 'https://nominatim.openstreetmap.org/search?q=' +
+            encodeURIComponent(q) + '&format=json&limit=5&accept-language=en';
+          const r = await fetch(url, { mode: 'cors', headers: { 'Accept': 'application/json' } });
+          if (!r.ok) continue;
+          const d = await r.json();
+          if (Array.isArray(d) && d.length > 0) {
+            const pick = d.find(x => (x.display_name||'').toLowerCase().includes('india')) || d[0];
+            const parts = pick.display_name.split(',');
+            return { latitude: parseFloat(pick.lat), longitude: parseFloat(pick.lon), name: parts[0].trim(), admin1: (parts[1]||'').trim(), country: 'India' };
+          }
+        } catch(e) {}
+      }
+    }
+
+    throw new Error('Cannot find "' + rawQuery + '". Try just the city name e.g. "Najafgarh" or check spelling.');
+  }
+
+  // ── Open-Meteo fetch ──────────────────────────────────
+  async function fetchWeather(lat, lon) {
+    const params = 'latitude=' + lat + '&longitude=' + lon
+      + '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,uv_index,visibility,precipitation'
+      + '&hourly=temperature_2m,weather_code,precipitation_probability'
+      + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,sunrise,sunset,uv_index_max'
+      + '&timezone=Asia%2FKolkata&forecast_days=7';
+
+    // Try primary API
+    try {
+      const r = await fetch('https://api.open-meteo.com/v1/forecast?' + params, { mode: 'cors' });
+      if (r.ok) return await r.json();
+    } catch(e) {}
+
+    // Try without mode:cors explicitly
+    try {
+      const r = await fetch('https://api.open-meteo.com/v1/forecast?' + params);
+      if (r.ok) return await r.json();
+    } catch(e) {}
+
+    throw new Error(
+      'Weather data could not be loaded. ' +
+      'This tool requires an internet connection and must be hosted on a website — not opened as a local file. ' +
+      'If you are on GitHub Pages, please wait a moment and try again.'
+    );
+  }
+
+  // ── Reverse geocode ──────────────────────────────────
+  async function reverseGeocode(lat, lon) {
+    // Try BigDataCloud first (no API key, CORS ok)
+    try {
+      const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
+      const r = await fetch(url, { mode: 'cors' });
+      if (r.ok) {
+        const d = await r.json();
+        const name = d.locality || d.city || d.principalSubdivision || 'Your Location';
+        const full = [d.locality || d.city, d.principalSubdivision, d.countryName].filter(Boolean).join(', ');
+        return { name, full };
+      }
+    } catch {}
+    // Fallback: use Open-Meteo reverse search via nearby place name
+    try {
+      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${lat.toFixed(2)},${lon.toFixed(2)}&count=1&language=en&format=json`;
+      const r = await fetch(url, { mode: 'cors' });
+      const d = await r.json();
+      if (d.results && d.results[0]) {
+        return { name: d.results[0].name, full: [d.results[0].name, d.results[0].admin1].filter(Boolean).join(', ') };
+      }
+    } catch {}
+    return { name: 'Your Location', full: `${lat.toFixed(3)}°N, ${lon.toFixed(3)}°E` };
+  }
+
+  // ── Wind direction ─────────────────────────────────────
+  function windDir(deg) {
+    const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+    return dirs[Math.round(deg / 45) % 8];
+  }
+
+  // ── AQI note for Indian cities ─────────────────────────
+  function aqiBadge(city) {
+    // Approximate AQI by known city patterns (just informational label)
+    const lc = (city || '').toLowerCase();
+    if (lc.includes('delhi') || lc.includes('dwarka') || lc.includes('gurgaon') || lc.includes('noida')) {
+      return `<div class="aqi-badge" style="background:rgba(255,82,82,0.15);color:#ff8a80;border:1px solid rgba(255,82,82,0.3)">🏭 High Pollution Zone — Check CPCB app for live AQI</div>`;
+    }
+    if (lc.includes('shimla') || lc.includes('dharamkot') || lc.includes('manali') || lc.includes('mcleod') || lc.includes('ooty') || lc.includes('munnar')) {
+      return `<div class="aqi-badge" style="background:rgba(105,240,174,0.15);color:#69f0ae;border:1px solid rgba(105,240,174,0.3)">🌿 Clean Air Zone</div>`;
+    }
+    return '';
+  }
+
+  // ── MY WEATHER ────────────────────────────────────────
+  let lastMyData = null;
+
+  function showMyLoading(v) {
+    document.getElementById('my-loading').style.display = v ? 'block' : 'none';
+    document.getElementById('my-results').style.display = v ? 'none' : (lastMyData ? 'block' : 'none');
+  }
+
+  function showMyError(msg) {
+    const el = document.getElementById('my-error');
+    el.textContent = msg; el.classList.toggle('show', !!msg);
+  }
+
+  async function detectLocation() {
+    if (!navigator.geolocation) { showMyError('Geolocation not supported in this browser.'); return; }
+    document.getElementById('loc-btn').disabled = true;
+    document.getElementById('loc-btn').textContent = '⏳ Detecting location…';
+    showMyError('');
+    showMyLoading(true);
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        const [geo, weather] = await Promise.all([reverseGeocode(lat, lon), fetchWeather(lat, lon)]);
+        lastMyData = { geo, weather, lat, lon };
+        renderMyWeather(lastMyData);
+        showMyLoading(false);
+        document.getElementById('my-results').style.display = 'block';
+      } catch(e) { showMyError('⚠️ ' + e.message); showMyLoading(false); }
+      document.getElementById('loc-btn').disabled = false;
+      document.getElementById('loc-btn').textContent = '📍 Detect My Location Automatically';
+    }, err => {
+      const isLocalFile = window.location.protocol === 'file:';
+      if (isLocalFile) {
+        showMyError('⚠️ This tool needs to run from a website — not a local file. Upload it to Hostinger and it will work perfectly. Local HTML files cannot access GPS or weather APIs.');
+        return;
+      }
+      showMyError('Location access denied. Please allow location or search manually.');
+      showMyLoading(false);
+      document.getElementById('loc-btn').disabled = false;
+      document.getElementById('loc-btn').textContent = '📍 Detect My Location Automatically';
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  }
+
+  async function searchMyCity() {
+    const q = document.getElementById('my-city-input').value.trim();
+    if (!q) return;
+    showMyError('');
+    showMyLoading(true);
+    try {
+      const place = await geocode(q);
+      const weather = await fetchWeather(place.latitude, place.longitude);
+      const geo = { name: place.name, full: [place.name, place.admin1, place.country].filter(Boolean).join(', ') };
+      lastMyData = { geo, weather, lat: place.latitude, lon: place.longitude };
+      renderMyWeather(lastMyData);
+      showMyLoading(false);
+      document.getElementById('my-results').style.display = 'block';
+    } catch(e) { showMyError('⚠️ ' + e.message); showMyLoading(false); }
+  }
+
+  function renderMyWeather({ geo, weather }) {
+    const c = weather.current;
+    const winfo = wc(c.weather_code);
+    const now = new Date();
+
+    document.getElementById('my-loc-label').textContent = geo.full;
+    document.getElementById('my-city-name').textContent = geo.name;
+    document.getElementById('my-time').textContent = now.toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' }) + ' · ' + now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+    document.getElementById('my-temp').textContent = dispTempNum(c.temperature_2m);
+    document.getElementById('my-temp-unit').textContent = '°' + tempUnit;
+    document.getElementById('my-icon').textContent = winfo.i;
+    document.getElementById('my-desc').textContent = winfo.d;
+    document.getElementById('my-feels').textContent = dispTemp(c.apparent_temperature);
+    document.getElementById('my-humidity').textContent = c.relative_humidity_2m + '%';
+    document.getElementById('my-wind').textContent = Math.round(c.wind_speed_10m) + ' km/h ' + windDir(c.wind_direction_10m);
+    document.getElementById('my-uv').textContent = c.uv_index?.toFixed(1) || '—';
+    document.getElementById('my-vis').textContent = c.visibility ? (c.visibility / 1000).toFixed(1) + ' km' : '—';
+    document.getElementById('my-hero-bg').style.background = winfo.g;
+    document.getElementById('my-aqi-wrap').innerHTML = aqiBadge(geo.full);
+
+    // Hourly (next 24)
+    const times = weather.hourly.time;
+    const temps = weather.hourly.temperature_2m;
+    const codes = weather.hourly.weather_code;
+    const rains = weather.hourly.precipitation_probability;
+    const nowHour = new Date().toISOString().slice(0,13);
+    let startIdx = times.findIndex(t => t.slice(0,13) >= nowHour);
+    if (startIdx < 0) startIdx = 0;
+    let hourHtml = '';
+    for (let i = startIdx; i < Math.min(startIdx + 24, times.length); i++) {
+      const t = new Date(times[i]);
+      const label = i === startIdx ? 'Now' : t.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+      hourHtml += `<div class="hour-item ${i===startIdx?'now':''}">
+        <div class="hi-time">${label}</div>
+        <div class="hi-icon">${wc(codes[i]).i}</div>
+        <div class="hi-temp">${dispTemp(temps[i])}</div>
+        <div class="hi-rain">💧${rains[i]}%</div>
+      </div>`;
+    }
+    document.getElementById('my-hourly').innerHTML = hourHtml;
+
+    // Weekly
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    let weekHtml = '';
+    weather.daily.time.forEach((d, i) => {
+      const dt = new Date(d);
+      const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : days[dt.getDay()];
+      weekHtml += `<div class="day-row">
+        <div class="dr-day">${label}</div>
+        <div class="dr-icon">${wc(weather.daily.weather_code[i]).i}</div>
+        <div class="dr-desc">${wc(weather.daily.weather_code[i]).d}</div>
+        <div class="dr-temps">
+          <span class="dr-low">${dispTemp(weather.daily.temperature_2m_min[i])}</span>
+          <span style="color:var(--border)">·</span>
+          <span class="dr-high">${dispTemp(weather.daily.temperature_2m_max[i])}</span>
+        </div>
+        <div class="dr-rain">💧${weather.daily.precipitation_probability_max[i]}%</div>
+      </div>`;
+    });
+    document.getElementById('my-weekly').innerHTML = weekHtml;
+  }
+
+  // ── COMPARE ───────────────────────────────────────────
+  let lastCmpData = [];
+
+  const COMP_COLORS = [
+    'linear-gradient(160deg,#1565c0,#0288d1)',
+    'linear-gradient(160deg,#4a148c,#7b1fa2)',
+    'linear-gradient(160deg,#1b5e20,#2e7d32)',
+    'linear-gradient(160deg,#bf360c,#e64a19)',
+  ];
+
+  async function compareAll() {
+    const cities = ['cc1','cc2','cc3','cc4']
+      .map(id => document.getElementById(id).value.replace(/,/g,' ').replace(/\s+/g,' ').trim())
+      .filter(Boolean);
+    if (cities.length < 2) { showCmpError('Please enter at least 2 cities to compare.'); return; }
+    showCmpError('');
+    document.getElementById('cmp-loading').style.display = 'block';
+    document.getElementById('cmp-results').style.display = 'none';
+    document.getElementById('compare-btn').disabled = true;
+
+    try {
+      // Fetch one by one for better error messages
+      const results = [];
+      for (let i = 0; i < cities.length; i++) {
+        const city = cities[i];
+        try {
+          const place = await geocode(city);
+          const weather = await fetchWeather(place.latitude, place.longitude);
+          const geo = { name: place.name, full: [place.name, place.admin1, place.country].filter(Boolean).join(', ') };
+          results.push({ geo, weather, color: COMP_COLORS[i] });
+        } catch(cityErr) {
+          if (window.location.protocol === 'file:') {
+            throw new Error('This tool must be uploaded to your website to work. Local HTML files cannot call weather APIs. Upload to GitHub or Hostinger and it will work perfectly.');
+          }
+          throw new Error('City ' + (i+1) + ' ("' + city + '"): ' + cityErr.message);
+        }
+      }
+      lastCmpData = results;
+      renderCompare(results);
+      document.getElementById('cmp-loading').style.display = 'none';
+      document.getElementById('cmp-results').style.display = 'block';
+    } catch(e) {
+      showCmpError('⚠️ ' + e.message + '. Tip: Add state/country for accuracy e.g. "Dwarka Delhi" or "Dharamkot Himachal Pradesh"');
+      document.getElementById('cmp-loading').style.display = 'none';
+    }
+    document.getElementById('compare-btn').disabled = false;
+  }
+
+  function showCmpError(msg) {
+    const el = document.getElementById('cmp-error');
+    el.textContent = msg; el.classList.toggle('show', !!msg);
+  }
+
+  function renderCompare(results) {
+    try {
+    const temps = results.map(r => r.weather.current.temperature_2m);
+    const maxTemp = Math.max(...temps);
+    const minTemp = Math.min(...temps);
+    const tempRange = maxTemp - minTemp || 1;
+
+    // Cards
+    let cardsHtml = '';
+    results.forEach((r, i) => {
+      const c = r.weather.current;
+      const info = wc(c.weather_code || 0);
+      const rank = i === temps.indexOf(maxTemp) ? '🔥 Hottest' : i === temps.indexOf(minTemp) ? '❄️ Coolest' : '';
+      const uv = (c.uv_index !== undefined && c.uv_index !== null) ? c.uv_index.toFixed(1) : '—';
+      const wind = c.wind_speed_10m !== undefined ? Math.round(c.wind_speed_10m) + 'km/h' : '—';
+      const humidity = c.relative_humidity_2m !== undefined ? c.relative_humidity_2m + '%' : '—';
+      const feelsLike = c.apparent_temperature !== undefined ? dispTemp(c.apparent_temperature) : '—';
+      cardsHtml += '<div class="comp-card">' +
+        '<div class="cc-bg" style="background:' + r.color + '"></div>' +
+        '<div class="cc-content">' +
+          (rank ? '<div class="cc-rank">' + rank + '</div>' : '') +
+          '<div class="cc-city">' + r.geo.name + '</div>' +
+          '<div class="cc-region">' + r.geo.full + '</div>' +
+          '<div class="cc-icon">' + info.i + '</div>' +
+          '<div class="cc-temp">' + dispTempNum(c.temperature_2m) + '<span style="font-size:1.4rem;opacity:0.8">°' + tempUnit + '</span></div>' +
+          '<div class="cc-desc">' + info.d + '</div>' +
+          '<div class="cc-mini-stats">' +
+            '<div class="cc-mini-stat"><div class="cms-val">💧' + humidity + '</div><div class="cms-lbl">Humidity</div></div>' +
+            '<div class="cc-mini-stat"><div class="cms-val">💨' + wind + '</div><div class="cms-lbl">Wind</div></div>' +
+            '<div class="cc-mini-stat"><div class="cms-val">🌡️' + feelsLike + '</div><div class="cms-lbl">Feels Like</div></div>' +
+            '<div class="cc-mini-stat"><div class="cms-val">☀️' + uv + '</div><div class="cms-lbl">UV Index</div></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    });
+    document.getElementById('compare-grid').innerHTML = cardsHtml;
+
+    // Diff bars
+    let barsHtml = '';
+    results.forEach((r, i) => {
+      const t = r.weather.current.temperature_2m;
+      const pct = Math.round((t - minTemp) / tempRange * 100);
+      const barColors = ['#4fc3f7','#ce93d8','#a5d6a7','#ffab91'];
+      barsHtml += `<div class="diff-bar-wrap">
+        <div class="diff-bar-header">
+          <span>${r.geo.name}</span>
+          <span style="color:white;font-weight:700">${dispTemp(t)}</span>
+        </div>
+        <div class="diff-bar-track">
+          <div class="diff-bar-fill" style="width:${Math.max(pct,8)}%;background:${barColors[i]}"></div>
+        </div>
+      </div>`;
+    });
+    // Show difference summary
+    const diff = maxTemp - minTemp;
+    barsHtml += `<div style="margin-top:14px;padding:12px 14px;background:rgba(79,195,247,0.08);border-radius:10px;border:1px solid var(--border);font-size:0.82rem;color:var(--muted)">
+      Temperature difference between hottest and coolest: <strong style="color:var(--accent)">${dispTemp(diff).replace('°C','°').replace('°F','°')} ${tempUnit}</strong>
+      (${results[temps.indexOf(maxTemp)].geo.name} is ${diff.toFixed(1)}°C warmer than ${results[temps.indexOf(minTemp)].geo.name})
+    </div>`;
+    document.getElementById('diff-bars').innerHTML = barsHtml;
+
+    // Weekly comparison
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const cols = '80px ' + results.map(() => '1fr').join(' ');
+    let weekHtml = '<div style="display:grid;grid-template-columns:' + cols + ';gap:8px;margin-bottom:10px">' +
+      '<div style="font-size:0.7rem;color:var(--muted);font-weight:700;text-transform:uppercase">Day</div>' +
+      results.map(r => '<div style="font-size:0.75rem;font-weight:700;color:var(--accent);text-align:center">' + r.geo.name + '</div>').join('') +
+    '</div>';
+
+    const numDays = Math.min(7, (results[0].weather.daily && results[0].weather.daily.time ? results[0].weather.daily.time.length : 0));
+    for (let d = 0; d < numDays; d++) {
+      const timeStr = results[0].weather.daily.time[d];
+      const dt = new Date(timeStr + 'T12:00:00');
+      const label = d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : days[dt.getDay()];
+      weekHtml += '<div style="display:grid;grid-template-columns:' + cols + ';gap:8px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center">' +
+        '<div style="font-size:0.8rem;color:var(--text);font-weight:600">' + label + '</div>' +
+        results.map(r => {
+          const daily = r.weather.daily || {};
+          const hi = (daily.temperature_2m_max || [])[d];
+          const lo = (daily.temperature_2m_min || [])[d];
+          const code = (daily.weather_code || [])[d] || 0;
+          const info = wc(code);
+          return '<div style="text-align:center">' +
+            '<div style="font-size:1.2rem">' + info.i + '</div>' +
+            '<div style="font-size:0.78rem;font-weight:700;color:var(--text)">' + (hi !== undefined ? dispTemp(hi) : '—') + '</div>' +
+            '<div style="font-size:0.68rem;color:var(--muted)">' + (lo !== undefined ? dispTemp(lo) : '—') + '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }
+    document.getElementById('cmp-weekly').innerHTML = weekHtml;
+
+    } catch(renderErr) {
+      console.error('renderCompare error:', renderErr);
+      showCmpError('Display error: ' + renderErr.message + '. Please try again.');
+    }
+  }
+</script>
+</body>
+</html>
